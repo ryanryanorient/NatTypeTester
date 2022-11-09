@@ -1,18 +1,10 @@
-using Dns.Net.Abstractions;
-using Dns.Net.Clients;
 using JetBrains.Annotations;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Volo.Abp.Modularity;
 
-namespace NatTypeTester.ViewModels;
-
-[UsedImplicitly]
-public class NatTypeTesterViewModelModule : AbpModule
+namespace NatTypeTester.ViewModels
 {
-	public override void ConfigureServices(ServiceConfigurationContext context)
+	[UsedImplicitly]
+	public class NatTypeTesterViewModelModule : AbpModule
 	{
-		context.Services.TryAddTransient<IDnsClient, DefaultDnsClient>();
-		context.Services.TryAddTransient<DefaultAClient>();
-		context.Services.TryAddTransient<DefaultAAAAClient>();
 	}
 }

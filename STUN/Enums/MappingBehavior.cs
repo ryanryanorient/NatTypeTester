@@ -1,12 +1,13 @@
-namespace STUN.Enums;
-
-public enum MappingBehavior
+namespace STUN.Enums
 {
-	Unknown,
-	UnsupportedServer,
-	Direct,
-	EndpointIndependent,
-	AddressDependent,
-	AddressAndPortDependent,
-	Fail
+	public enum MappingBehavior
+	{
+		Unknown,
+		UnsupportedServer,
+		Direct,
+		EndpointIndependent,
+		AddressDependent,
+		AddressAndPortDependent,
+		Fail
+	}
 }

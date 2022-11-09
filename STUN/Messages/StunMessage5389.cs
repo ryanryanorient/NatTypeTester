@@ -1,117 +1,121 @@
 using Microsoft;
 using STUN.Enums;
+using System;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Security.Cryptography;
 
-namespace STUN.Messages;
-
-/// <summary>
-/// https://tools.ietf.org/html/rfc5389#section-6
-/// </summary>
-public class StunMessage5389
+namespace STUN.Messages
 {
-	#region Header
-
-	public StunMessageType StunMessageType { get; set; }
-
-	public uint MagicCookie { get; set; }
-
-	public byte[] TransactionId { get; }
-
-	#endregion
-
-	public IEnumerable<StunAttribute> Attributes { get; set; }
-
-	public StunMessage5389()
+	/// <summary>
+	/// https://tools.ietf.org/html/rfc5389#section-6
+	/// </summary>
+	public class StunMessage5389
 	{
-		Attributes = Array.Empty<StunAttribute>();
-		StunMessageType = StunMessageType.BindingRequest;
-		MagicCookie = 0x2112A442;
-		TransactionId = new byte[12];
-		RandomNumberGenerator.Fill(TransactionId);
-	}
+		#region Header
 
-	public int WriteTo(Span<byte> buffer)
-	{
-		ushort messageLength = Attributes.Aggregate<StunAttribute, ushort>(0, (current, attribute) => (ushort)(current + attribute.RealLength));
-		int length = 20 + messageLength;
-		Requires.Range(buffer.Length >= length, nameof(buffer));
+		public StunMessageType StunMessageType { get; set; }
 
-		BinaryPrimitives.WriteUInt16BigEndian(buffer, (ushort)StunMessageType);
-		BinaryPrimitives.WriteUInt16BigEndian(buffer[2..], messageLength);
-		BinaryPrimitives.WriteUInt32BigEndian(buffer[4..], MagicCookie);
-		TransactionId.CopyTo(buffer[8..]);
+		public uint MagicCookie { get; set; }
 
-		buffer = buffer[20..];
-		foreach (StunAttribute? attribute in Attributes)
+		public byte[] TransactionId { get; }
+
+		#endregion
+
+		public IEnumerable<StunAttribute> Attributes { get; set; }
+
+		public StunMessage5389()
 		{
-			int outLength = attribute.WriteTo(buffer);
-			buffer = buffer[outLength..];
+			Attributes = Array.Empty<StunAttribute>();
+			StunMessageType = StunMessageType.BindingRequest;
+			MagicCookie = 0x2112A442;
+			TransactionId = new byte[12];
+			RandomNumberGenerator.Fill(TransactionId);
 		}
 
-		return length;
-	}
-
-	public bool TryParse(ReadOnlySpan<byte> buffer)
-	{
-		if (buffer.Length < 20)
+		public int WriteTo(Span<byte> buffer)
 		{
-			return false; // Check length
-		}
+			var messageLength = Attributes.Aggregate<StunAttribute, ushort>(0, (current, attribute) => (ushort)(current + attribute.RealLength));
+			var length = 20 + messageLength;
+			Requires.Range(buffer.Length >= length, nameof(buffer));
 
-		Span<byte> tempSpan = stackalloc byte[2];
+			BinaryPrimitives.WriteUInt16BigEndian(buffer, (ushort)StunMessageType);
+			BinaryPrimitives.WriteUInt16BigEndian(buffer[2..], messageLength);
+			BinaryPrimitives.WriteUInt32BigEndian(buffer[4..], MagicCookie);
+			TransactionId.CopyTo(buffer[8..]);
 
-		tempSpan[0] = (byte)(buffer[0] & 0b0011_1111);
-		tempSpan[1] = buffer[1];
-		StunMessageType type = (StunMessageType)BinaryPrimitives.ReadUInt16BigEndian(tempSpan);
-
-		if (!Enum.IsDefined(typeof(StunMessageType), type))
-		{
-			return false;
-		}
-
-		StunMessageType = type;
-
-		ushort length = BinaryPrimitives.ReadUInt16BigEndian(buffer[2..]);
-
-		MagicCookie = BinaryPrimitives.ReadUInt32BigEndian(buffer[4..]);
-
-		buffer.Slice(8, 12).CopyTo(TransactionId);
-
-		if (buffer.Length != length + 20)
-		{
-			return false; // Check length
-		}
-
-		List<StunAttribute> list = new();
-
-		ReadOnlySpan<byte> attributeBuffer = buffer[20..];
-		ReadOnlySpan<byte> magicCookieAndTransactionId = buffer.Slice(4, 16);
-
-		while (attributeBuffer.Length > 0)
-		{
-			StunAttribute attribute = new();
-			int offset = attribute.TryParse(attributeBuffer, magicCookieAndTransactionId);
-			if (offset > 0)
+			buffer = buffer[20..];
+			foreach (var attribute in Attributes)
 			{
-				list.Add(attribute);
-				attributeBuffer = attributeBuffer[offset..];
+				var outLength = attribute.WriteTo(buffer);
+				buffer = buffer[outLength..];
 			}
-			else
-			{
-				Debug.WriteLine($@"[Warning] Ignore wrong attribute: {Convert.ToHexString(attributeBuffer)}");
-				break;
-			}
+
+			return length;
 		}
 
-		Attributes = list;
+		public bool TryParse(ReadOnlySpan<byte> buffer)
+		{
+			if (buffer.Length < 20)
+			{
+				return false; // Check length
+			}
 
-		return true;
-	}
+			Span<byte> tempSpan = stackalloc byte[2];
 
-	public bool IsSameTransaction(StunMessage5389 other)
-	{
-		return MagicCookie == other.MagicCookie && TransactionId.AsSpan().SequenceEqual(other.TransactionId);
+			tempSpan[0] = (byte)(buffer[0] & 0b0011_1111);
+			tempSpan[1] = buffer[1];
+			var type = (StunMessageType)BinaryPrimitives.ReadUInt16BigEndian(tempSpan);
+
+			if (!Enum.IsDefined(typeof(StunMessageType), type))
+			{
+				return false;
+			}
+
+			StunMessageType = type;
+
+			var length = BinaryPrimitives.ReadUInt16BigEndian(buffer[2..]);
+
+			MagicCookie = BinaryPrimitives.ReadUInt32BigEndian(buffer[4..]);
+
+			buffer.Slice(8, 12).CopyTo(TransactionId);
+
+			if (buffer.Length != length + 20)
+			{
+				return false; // Check length
+			}
+
+			var list = new List<StunAttribute>();
+
+			var attributeBuffer = buffer[20..];
+			var magicCookieAndTransactionId = buffer.Slice(4, 16);
+
+			while (attributeBuffer.Length > 0)
+			{
+				var attribute = new StunAttribute();
+				var offset = attribute.TryParse(attributeBuffer, magicCookieAndTransactionId);
+				if (offset > 0)
+				{
+					list.Add(attribute);
+					attributeBuffer = attributeBuffer[offset..];
+				}
+				else
+				{
+					Debug.WriteLine($@"[Warning] Ignore wrong attribute: {Convert.ToHexString(attributeBuffer)}");
+					break;
+				}
+			}
+
+			Attributes = list;
+
+			return true;
+		}
+
+		public bool IsSameTransaction(StunMessage5389 other)
+		{
+			return MagicCookie == other.MagicCookie && TransactionId.AsSpan().SequenceEqual(other.TransactionId);
+		}
 	}
 }

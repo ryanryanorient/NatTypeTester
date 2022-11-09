@@ -1,9 +1,10 @@
 using ReactiveUI;
 using Volo.Abp.DependencyInjection;
 
-namespace NatTypeTester.ViewModels;
-
-public abstract class ViewModelBase : ReactiveObject, ISingletonDependency
+namespace NatTypeTester.ViewModels
 {
-	public IAbpLazyServiceProvider LazyServiceProvider { get; set; } = null!;
+	public abstract class ViewModelBase : ReactiveObject, ISingletonDependency
+	{
+		public IAbpLazyServiceProvider LazyServiceProvider { get; set; } = null!;
+	}
 }

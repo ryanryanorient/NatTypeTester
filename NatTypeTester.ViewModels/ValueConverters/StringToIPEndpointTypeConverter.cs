@@ -1,52 +1,54 @@
 using JetBrains.Annotations;
 using ReactiveUI;
+using System;
 using System.Net;
 using Volo.Abp.DependencyInjection;
 
-namespace NatTypeTester.ViewModels.ValueConverters;
-
-[ExposeServices(typeof(IBindingTypeConverter))]
-[UsedImplicitly]
-public class StringToIPEndpointTypeConverter : IBindingTypeConverter, ISingletonDependency
+namespace NatTypeTester.ViewModels.ValueConverters
 {
-	public int GetAffinityForObjects(Type fromType, Type toType)
+	[ExposeServices(typeof(IBindingTypeConverter))]
+	[UsedImplicitly]
+	public class StringToIPEndpointTypeConverter : IBindingTypeConverter, ISingletonDependency
 	{
-		if (fromType == typeof(string) && toType == typeof(IPEndPoint))
+		public int GetAffinityForObjects(Type fromType, Type toType)
 		{
-			return 11;
-		}
-
-		if (fromType == typeof(IPEndPoint) && toType == typeof(string))
-		{
-			return 11;
-		}
-
-		return 0;
-	}
-
-	public bool TryConvert(object? from, Type toType, object? conversionHint, out object? result)
-	{
-		if (toType == typeof(IPEndPoint) && from is string str)
-		{
-			if (IPEndPoint.TryParse(str, out IPEndPoint? ipe))
+			if (fromType == typeof(string) && toType == typeof(IPEndPoint))
 			{
-				result = ipe;
-				return true;
+				return 11;
 			}
 
-			result = null;
+			if (fromType == typeof(IPEndPoint) && toType == typeof(string))
+			{
+				return 11;
+			}
+
+			return 0;
+		}
+
+		public bool TryConvert(object? from, Type toType, object? conversionHint, out object? result)
+		{
+			if (toType == typeof(IPEndPoint) && from is string str)
+			{
+				if (IPEndPoint.TryParse(str, out var ipe))
+				{
+					result = ipe;
+					return true;
+				}
+
+				result = null;
+				return false;
+			}
+
+			if (from is IPEndPoint fromIPEndPoint)
+			{
+				result = fromIPEndPoint.ToString();
+			}
+			else
+			{
+				result = string.Empty;
+			}
+
 			return true;
 		}
-
-		if (from is IPEndPoint fromIPEndPoint)
-		{
-			result = fromIPEndPoint.ToString();
-		}
-		else
-		{
-			result = string.Empty;
-		}
-
-		return true;
 	}
 }

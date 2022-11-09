@@ -1,8 +1,13 @@
-namespace STUN.Client;
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 
-public interface IStunClient : IDisposable
+namespace STUN.Client
 {
-	ValueTask ConnectProxyAsync(CancellationToken cancellationToken = default);
-	ValueTask CloseProxyAsync(CancellationToken cancellationToken = default);
-	ValueTask QueryAsync(CancellationToken cancellationToken = default);
+	public interface IStunClient : IDisposable
+	{
+		ValueTask ConnectProxyAsync(CancellationToken cancellationToken = default);
+		ValueTask CloseProxyAsync(CancellationToken cancellationToken = default);
+		ValueTask QueryAsync(CancellationToken cancellationToken = default);
+	}
 }

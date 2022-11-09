@@ -1,17 +1,20 @@
 using NatTypeTester.Dialogs;
+using System;
+using System.Threading.Tasks;
 
-namespace NatTypeTester.Utils;
-
-public static class Extensions
+namespace NatTypeTester.Utils
 {
-	public static async Task HandleExceptionWithContentDialogAsync(this Exception ex)
+	public static class Extensions
 	{
-		using DisposableContentDialog dialog = new()
+		public static async Task HandleExceptionWithContentDialogAsync(this Exception ex)
 		{
-			Title = nameof(NatTypeTester),
-			Content = ex.Message,
-			PrimaryButtonText = @"OK"
-		};
-		await dialog.ShowAsync();
+			using var dialog = new DisposableContentDialog
+			{
+				Title = nameof(NatTypeTester),
+				Content = ex.Message,
+				PrimaryButtonText = @"OK"
+			};
+			await dialog.ShowAsync();
+		}
 	}
 }

@@ -1,11 +1,13 @@
 using ModernWpf.Controls;
+using System;
 
-namespace NatTypeTester.Dialogs;
-
-public class DisposableContentDialog : ContentDialog, IDisposable
+namespace NatTypeTester.Dialogs
 {
-	public void Dispose()
+	public class DisposableContentDialog : ContentDialog, IDisposable
 	{
-		Hide();
+		public void Dispose()
+		{
+			Hide();
+		}
 	}
 }

@@ -1,7 +1,8 @@
-namespace STUN.Enums;
-
-public enum ProxyType
+namespace STUN.Enums
 {
-	Plain = 0,
-	Socks5 = 1
+	public enum ProxyType
+	{
+		Plain = 0,
+		Socks5 = 1
+	}
 }

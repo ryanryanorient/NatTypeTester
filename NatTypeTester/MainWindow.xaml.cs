@@ -3,37 +3,39 @@ using ModernWpf.Controls;
 using NatTypeTester.ViewModels;
 using ReactiveMarbles.ObservableEvents;
 using ReactiveUI;
+using System;
+using System.Linq;
 using System.Reactive.Disposables;
 using Volo.Abp.DependencyInjection;
 
-namespace NatTypeTester;
-
-public partial class MainWindow : ISingletonDependency
+namespace NatTypeTester
 {
-	public MainWindow(MainWindowViewModel viewModel, IServiceProvider serviceProvider)
+	public partial class MainWindow : ISingletonDependency
 	{
-		InitializeComponent();
-		ViewModel = viewModel;
-
-		this.WhenActivated(d =>
+		public MainWindow(MainWindowViewModel viewModel, IServiceProvider serviceProvider)
 		{
-			#region Server
+			InitializeComponent();
+			ViewModel = viewModel;
 
-			this.Bind(ViewModel,
-				vm => vm.Config.StunServer,
-				v => v.ServersComboBox.Text
-			).DisposeWith(d);
+			this.WhenActivated(d =>
+			{
+				#region Server
 
-			this.OneWayBind(ViewModel,
-				vm => vm.StunServers,
-				v => v.ServersComboBox.ItemsSource
-			).DisposeWith(d);
+				this.Bind(ViewModel,
+						vm => vm.Config.StunServer,
+						v => v.ServersComboBox.Text
+				).DisposeWith(d);
 
-			#endregion
+				this.OneWayBind(ViewModel,
+						vm => vm.StunServers,
+						v => v.ServersComboBox.ItemsSource
+				).DisposeWith(d);
 
-			this.Bind(ViewModel, vm => vm.Router, v => v.RoutedViewHost.Router).DisposeWith(d);
+				#endregion
 
-			NavigationView.Events().SelectionChanged
+				this.Bind(ViewModel, vm => vm.Router, v => v.RoutedViewHost.Router).DisposeWith(d);
+
+				NavigationView.Events().SelectionChanged
 				.Subscribe(parameter =>
 				{
 					if (parameter.args.IsSettingsSelected)
@@ -61,9 +63,10 @@ public partial class MainWindow : ISingletonDependency
 						}
 					}
 				}).DisposeWith(d);
-			NavigationView.SelectedItem = NavigationView.MenuItems.OfType<NavigationViewItem>().First();
+				NavigationView.SelectedItem = NavigationView.MenuItems.OfType<NavigationViewItem>().First();
 
-			ViewModel.LoadStunServer();
-		});
+				ViewModel.LoadStunServer();
+			});
+		}
 	}
 }

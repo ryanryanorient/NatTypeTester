@@ -1,17 +1,20 @@
-namespace STUN.Messages.StunAttributeValues;
+using System;
 
-/// <summary>
-/// 无法理解的属性
-/// </summary>
-public class UselessStunAttributeValue : IStunAttributeValue
+namespace STUN.Messages.StunAttributeValues
 {
-	public int WriteTo(Span<byte> buffer)
+	/// <summary>
+	/// 无法理解的属性
+	/// </summary>
+	public class UselessStunAttributeValue : IStunAttributeValue
 	{
-		throw new NotSupportedException();
-	}
+		public int WriteTo(Span<byte> buffer)
+		{
+			throw new NotSupportedException();
+		}
 
-	public bool TryParse(ReadOnlySpan<byte> buffer)
-	{
-		return true;
+		public bool TryParse(ReadOnlySpan<byte> buffer)
+		{
+			return true;
+		}
 	}
 }

@@ -4,67 +4,73 @@ using Microsoft.VisualStudio.Threading;
 using NatTypeTester.Models;
 using ReactiveUI;
 using STUN;
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.Linq;
 using System.Reactive.Linq;
+using System.Threading.Tasks;
 using Volo.Abp.DependencyInjection;
 
-namespace NatTypeTester.ViewModels;
-
-[ExposeServices(
-	typeof(MainWindowViewModel),
-	typeof(IScreen)
-)]
-public class MainWindowViewModel : ViewModelBase, IScreen
+namespace NatTypeTester.ViewModels
 {
-	public RoutingState Router => LazyServiceProvider.LazyGetRequiredService<RoutingState>();
-
-	public Config Config => LazyServiceProvider.LazyGetRequiredService<Config>();
-
-	private readonly IEnumerable<string> _defaultServers = new HashSet<string>
+	[ExposeServices(
+		typeof(MainWindowViewModel),
+		typeof(IScreen)
+	)]
+	public class MainWindowViewModel : ViewModelBase, IScreen
 	{
-		@"stun.syncthing.net",
-		@"stun.qq.com",
-		@"stun.miwifi.com",
-		@"stun.bige0.com",
-		@"stun.stunprotocol.org"
-	};
+		public RoutingState Router => LazyServiceProvider.LazyGetRequiredService<RoutingState>();
 
-	private SourceList<string> List { get; } = new();
-	public readonly IObservableCollection<string> StunServers = new ObservableCollectionExtended<string>();
+		public Config Config => LazyServiceProvider.LazyGetRequiredService<Config>();
 
-	public MainWindowViewModel()
-	{
-		List.Connect()
-			.DistinctValues(x => x)
-			.ObserveOn(RxApp.MainThreadScheduler)
-			.Bind(StunServers)
-			.Subscribe();
-	}
-
-	public void LoadStunServer()
-	{
-		foreach (string? server in _defaultServers)
+		private readonly IEnumerable<string> _defaultServers = new HashSet<string>
 		{
-			List.Add(server);
+				@"stun.syncthing.net",
+				@"stun.qq.com",
+				@"stun.miwifi.com",
+				@"stun.bige0.com",
+				@"stun.stunprotocol.org"
+		};
+
+		private SourceList<string> List { get; } = new();
+		public readonly IObservableCollection<string> StunServers = new ObservableCollectionExtended<string>();
+
+		public MainWindowViewModel()
+		{
+			List.Connect()
+				.DistinctValues(x => x)
+				.ObserveOn(RxApp.MainThreadScheduler)
+				.Bind(StunServers)
+				.Subscribe();
 		}
 
-		Config.StunServer = _defaultServers.First();
-
-		Task.Run(() =>
+		public void LoadStunServer()
 		{
-			const string path = @"stun.txt";
-
-			if (!File.Exists(path))
+			foreach (var server in _defaultServers)
 			{
-				return;
+				List.Add(server);
 			}
 
-			foreach (string? line in File.ReadLines(path))
+			Config.StunServer = _defaultServers.First();
+
+			Task.Run(() =>
 			{
-				if (!string.IsNullOrWhiteSpace(line) && StunServer.TryParse(line, out StunServer? stun))
+				const string path = @"stun.txt";
+
+				if (!File.Exists(path))
 				{
-					List.Add(stun.ToString());
+					return;
 				}
-			}
-		}).Forget();
+
+				foreach (var line in File.ReadLines(path))
+				{
+					if (!string.IsNullOrWhiteSpace(line) && StunServer.TryParse(line, out var stun))
+					{
+						List.Add(stun.ToString());
+					}
+				}
+			}).Forget();
+		}
 	}
 }

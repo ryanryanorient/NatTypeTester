@@ -5,34 +5,35 @@ using STUN.Enums;
 using System.Reactive.Disposables;
 using Volo.Abp.DependencyInjection;
 
-namespace NatTypeTester.Views;
-
-[ExposeServices(typeof(IViewFor<SettingViewModel>))]
-[UsedImplicitly]
-public partial class SettingView : ITransientDependency
+namespace NatTypeTester.Views
 {
-	public SettingView()
+	[ExposeServices(typeof(IViewFor<SettingViewModel>))]
+	[UsedImplicitly]
+	public partial class SettingView : ITransientDependency
 	{
-		InitializeComponent();
-
-		this.WhenActivated(d =>
+		public SettingView()
 		{
-			this.Bind(ViewModel, vm => vm.Config.ProxyServer, v => v.ProxyServerTextBox.Text).DisposeWith(d);
+			InitializeComponent();
 
-			this.Bind(ViewModel, vm => vm.Config.ProxyUser, v => v.ProxyUsernameTextBox.Text).DisposeWith(d);
+			this.WhenActivated(d =>
+			{
+				this.Bind(ViewModel, vm => vm.Config.ProxyServer, v => v.ProxyServerTextBox.Text).DisposeWith(d);
 
-			this.Bind(ViewModel, vm => vm.Config.ProxyPassword, v => v.ProxyPasswordTextBox.Text).DisposeWith(d);
+				this.Bind(ViewModel, vm => vm.Config.ProxyUser, v => v.ProxyUsernameTextBox.Text).DisposeWith(d);
 
-			this.Bind(ViewModel,
-				vm => vm.Config.ProxyType,
-				v => v.ProxyRadioButtons.SelectedIndex,
-				type => (int)type,
-				index =>
-				{
-					ProxyType type = (ProxyType)index;
-					ProxyConfigGrid.IsEnabled = type is not ProxyType.Plain;
-					return type;
-				}).DisposeWith(d);
-		});
+				this.Bind(ViewModel, vm => vm.Config.ProxyPassword, v => v.ProxyPasswordTextBox.Text).DisposeWith(d);
+
+				this.Bind(ViewModel,
+					vm => vm.Config.ProxyType,
+					v => v.ProxyRadioButtons.SelectedIndex,
+					type => (int)type,
+					index =>
+					{
+						var type = (ProxyType)index;
+						ProxyConfigGrid.IsEnabled = type is not ProxyType.Plain;
+						return type;
+					}).DisposeWith(d);
+			});
+		}
 	}
 }

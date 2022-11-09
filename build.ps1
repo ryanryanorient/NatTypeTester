@@ -1,19 +1,25 @@
+param([string]$rid = 'all')
 $ErrorActionPreference = 'Stop'
 
+Write-Host 'dotnet SDK info'
 dotnet --info
 
 $proj = 'NatTypeTester'
 $exe = "$proj.exe"
-$net_tfm = 'net6.0-windows'
+$net_tfm = 'net5.0-windows10.0.20348.0'
 $configuration = 'Release'
 $output_dir = "$PSScriptRoot\$proj\bin\$configuration"
 $proj_path = "$PSScriptRoot\$proj\$proj.csproj"
-$generic_outdir = "$output_dir\$net_tfm\generic"
 
-function Build-Generic {
+$dllpatcher_tfm = 'net5.0'
+$dllpatcher_dir = "$PSScriptRoot\Build\DotNetDllPathPatcher"
+$dllpatcher_exe = "$dllpatcher_dir\bin\$configuration\$dllpatcher_tfm\DotNetDllPathPatcher.exe"
+
+function Build-Generic
+{
     Write-Host 'Building generic'
 
-    $outdir = $generic_outdir
+    $outdir = "$output_dir\$net_tfm\generic"
     $publishDir = "$outdir\publish"
 
     Remove-Item $publishDir -Recurse -Force -Confirm:$false -ErrorAction Ignore
@@ -21,16 +27,14 @@ function Build-Generic {
     dotnet publish -c $configuration -f $net_tfm $proj_path -o $publishDir
     if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
-    & "$PSScriptRoot\Build\DotNetDllPathPatcher.ps1" "$publishDir\$exe" bin
+    & "$dllpatcher_exe" "$publishDir\$exe" bin
     if ($LASTEXITCODE) { exit $LASTEXITCODE }
-
-    Remove-Item "$publishDir\$exe"
 }
 
-function Build {
-    param([string]$arch)
+function Build-SelfContained
+{
+    param([string]$rid)
 
-    $rid = "win-$arch"
     Write-Host "Building $rid"
 
     $outdir = "$output_dir\$net_tfm\$rid"
@@ -38,16 +42,27 @@ function Build {
 
     Remove-Item $publishDir -Recurse -Force -Confirm:$false -ErrorAction Ignore
 
-    dotnet publish -c $configuration -f $net_tfm -r $rid --no-self-contained true $proj_path
+    dotnet publish -c $configuration -f $net_tfm -r $rid --self-contained true $proj_path
     if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
-    & "$PSScriptRoot\Build\DotNetDllPathPatcher.ps1" "$publishDir\$exe" bin
+    & "$dllpatcher_exe" "$publishDir\$exe" bin
     if ($LASTEXITCODE) { exit $LASTEXITCODE }
-
-    Move-Item "$publishDir\$exe" "$generic_outdir\publish\$proj-$arch.exe"
 }
 
-Build-Generic
-Build x64
-Build x86
-Build arm64
+dotnet build -c $configuration -f $dllpatcher_tfm $dllpatcher_dir\DotNetDllPathPatcher.csproj
+if ($LASTEXITCODE) { exit $LASTEXITCODE }
+
+if($rid -eq 'all' -or $rid -eq 'generic')
+{
+    Build-Generic
+}
+
+if($rid -eq 'all')
+{
+    Build-SelfContained win-x86
+    Build-SelfContained win-x64
+}
+elseif($rid -ne 'generic')
+{
+    Build-SelfContained $rid
+}

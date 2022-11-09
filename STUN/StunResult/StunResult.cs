@@ -1,15 +1,16 @@
 using System.Net;
 
-namespace STUN.StunResult;
-
-public abstract class StunResult
+namespace STUN.StunResult
 {
-	public IPEndPoint? PublicEndPoint { get; set; }
-	public IPEndPoint? LocalEndPoint { get; set; }
-
-	public virtual void Reset()
+	public abstract class StunResult
 	{
-		PublicEndPoint = default;
-		LocalEndPoint = default;
+		public IPEndPoint? PublicEndPoint { get; set; }
+		public IPEndPoint? LocalEndPoint { get; set; }
+
+		public virtual void Reset()
+		{
+			PublicEndPoint = default;
+			LocalEndPoint = default;
+		}
 	}
 }

@@ -2,49 +2,50 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Sockets;
 
-namespace STUN;
-
-public class StunServer
+namespace STUN
 {
-	public string Hostname { get; }
-	public ushort Port { get; }
-
-	private const ushort DefaultPort = 3478;
-
-	public StunServer()
+	public class StunServer
 	{
-		Hostname = @"stun.syncthing.net";
-		Port = DefaultPort;
-	}
+		public string Hostname { get; }
+		public ushort Port { get; }
 
-	private StunServer(string hostname, ushort port)
-	{
-		Hostname = hostname;
-		Port = port;
-	}
+		private const ushort DefaultPort = 3478;
 
-	public static bool TryParse(string s, [NotNullWhen(true)] out StunServer? result)
-	{
-		if (!HostnameEndpoint.TryParse(s, out HostnameEndpoint? host, DefaultPort))
+		public StunServer()
 		{
-			result = null;
-			return false;
+			Hostname = @"stun.syncthing.net";
+			Port = DefaultPort;
 		}
 
-		result = new StunServer(host.Hostname, host.Port);
-		return true;
-	}
+		private StunServer(string hostname, ushort port)
+		{
+			Hostname = hostname;
+			Port = port;
+		}
 
-	public override string ToString()
-	{
-		if (Port is DefaultPort)
+		public static bool TryParse(string s, [NotNullWhen(true)] out StunServer? result)
 		{
-			return Hostname;
+			if (!HostnameEndpoint.TryParse(s, out var host, DefaultPort))
+			{
+				result = null;
+				return false;
+			}
+
+			result = new StunServer(host.Hostname, host.Port);
+			return true;
 		}
-		if (IPAddress.TryParse(Hostname, out IPAddress? ip) && ip.AddressFamily is AddressFamily.InterNetworkV6)
+
+		public override string ToString()
 		{
-			return $@"[{ip}]:{Port}";
+			if (Port is DefaultPort)
+			{
+				return Hostname;
+			}
+			if (IPAddress.TryParse(Hostname, out var ip) && ip.AddressFamily is AddressFamily.InterNetworkV6)
+			{
+				return $@"[{ip}]:{Port}";
+			}
+			return $@"{Hostname}:{Port}";
 		}
-		return $@"{Hostname}:{Port}";
 	}
 }

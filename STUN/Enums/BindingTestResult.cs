@@ -1,9 +1,10 @@
-namespace STUN.Enums;
-
-public enum BindingTestResult
+namespace STUN.Enums
 {
-	Unknown,
-	UnsupportedServer,
-	Success,
-	Fail
+	public enum BindingTestResult
+	{
+		Unknown,
+		UnsupportedServer,
+		Success,
+		Fail
+	}
 }

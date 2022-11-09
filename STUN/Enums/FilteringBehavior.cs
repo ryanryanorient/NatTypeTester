@@ -1,11 +1,12 @@
-namespace STUN.Enums;
-
-public enum FilteringBehavior
+namespace STUN.Enums
 {
-	Unknown,
-	UnsupportedServer,
-	EndpointIndependent,
-	AddressDependent,
-	AddressAndPortDependent,
-	Fail
+	public enum FilteringBehavior
+	{
+		Unknown,
+		UnsupportedServer,
+		EndpointIndependent,
+		AddressDependent,
+		AddressAndPortDependent,
+		Fail
+	}
 }

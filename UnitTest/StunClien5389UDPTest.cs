@@ -7,384 +7,440 @@ using STUN.Enums;
 using STUN.Messages;
 using STUN.StunResult;
 using System.Net;
+using System.Threading;
+using System.Threading.Tasks;
 
-namespace UnitTest;
-
-[TestClass]
-public class StunClien5389UDPTest
+namespace UnitTest
 {
-	private readonly IDnsClient _dnsClient = new DefaultDnsClient();
-
-	private const string Server = @"stun.syncthing.net";
-	private const ushort Port = 3478;
-
-	private static readonly IPEndPoint Any = new(IPAddress.Any, 0);
-	private static readonly IPEndPoint LocalAddress1 = IPEndPoint.Parse(@"127.0.0.1:114");
-	private static readonly IPEndPoint MappedAddress1 = IPEndPoint.Parse(@"1.1.1.1:114");
-	private static readonly IPEndPoint MappedAddress2 = IPEndPoint.Parse(@"1.1.1.1:514");
-	private static readonly IPEndPoint ServerAddress = IPEndPoint.Parse(@"2.2.2.2:1919");
-	private static readonly IPEndPoint ChangedAddress1 = IPEndPoint.Parse(@"3.3.3.3:23333");
-	private static readonly IPEndPoint ChangedAddress2 = IPEndPoint.Parse(@"2.2.2.2:810");
-	private static readonly IPEndPoint ChangedAddress3 = IPEndPoint.Parse(@"3.3.3.3:1919");
-
-	private static readonly StunMessage5389 DefaultStunMessage = new();
-
-	[TestMethod]
-	public async Task BindingTestSuccessAsync()
+	[TestClass]
+	public class StunClien5389UDPTest
 	{
-		IPAddress ip = await _dnsClient.QueryAsync(Server);
-		using StunClient5389UDP client = new(new IPEndPoint(ip, Port), Any);
+		private readonly IDnsClient _dnsClient = new DefaultDnsClient();
 
-		StunResult5389 response = await client.BindingTestAsync();
+		private const string Server = @"stun.syncthing.net";
+		private const ushort Port = 3478;
 
-		Assert.AreEqual(BindingTestResult.Success, response.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, response.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, response.FilteringBehavior);
-		Assert.IsNotNull(response.PublicEndPoint);
-		Assert.IsNotNull(response.LocalEndPoint);
-		Assert.IsNotNull(response.OtherEndPoint);
-	}
+		private static readonly IPEndPoint Any = new(IPAddress.Any, 0);
+		private static readonly IPEndPoint LocalAddress1 = IPEndPoint.Parse(@"127.0.0.1:114");
+		private static readonly IPEndPoint MappedAddress1 = IPEndPoint.Parse(@"1.1.1.1:114");
+		private static readonly IPEndPoint MappedAddress2 = IPEndPoint.Parse(@"1.1.1.1:514");
+		private static readonly IPEndPoint ServerAddress = IPEndPoint.Parse(@"2.2.2.2:1919");
+		private static readonly IPEndPoint ChangedAddress1 = IPEndPoint.Parse(@"3.3.3.3:23333");
+		private static readonly IPEndPoint ChangedAddress2 = IPEndPoint.Parse(@"2.2.2.2:810");
+		private static readonly IPEndPoint ChangedAddress3 = IPEndPoint.Parse(@"3.3.3.3:1919");
 
-	[TestMethod]
-	public async Task BindingTestFailAsync()
-	{
-		IPAddress ip = IPAddress.Parse(@"1.1.1.1");
-		using StunClient5389UDP client = new(new IPEndPoint(ip, Port), Any);
+		private static readonly StunMessage5389 DefaultStunMessage = new();
 
-		StunResult5389 response = await client.BindingTestAsync();
-
-		Assert.AreEqual(BindingTestResult.Fail, response.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, response.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, response.FilteringBehavior);
-		Assert.IsNull(response.PublicEndPoint);
-		Assert.IsNull(response.LocalEndPoint);
-		Assert.IsNull(response.OtherEndPoint);
-	}
-
-	[TestMethod]
-	public async Task MappingBehaviorTestFailAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 fail = new() { BindingTestResult = BindingTestResult.Fail };
-
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(fail);
-
-		await client.MappingBehaviorTestAsync();
-
-		Assert.AreEqual(BindingTestResult.Fail, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
-		Assert.IsNull(client.State.PublicEndPoint);
-		Assert.IsNull(client.State.LocalEndPoint);
-		Assert.IsNull(client.State.OtherEndPoint);
-	}
-
-	[TestMethod]
-	public async Task MappingBehaviorTestUnsupportedServerAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task BindingTestSuccessAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		await TestAsync();
+			var ip = await _dnsClient.QueryAsync(Server);
+			using var client = new StunClient5389UDP(new IPEndPoint(ip, Port), Any);
 
-		StunResult5389 r2 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress2
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
-		await TestAsync();
+			var response = await client.BindingTestAsync();
 
-		StunResult5389 r3 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress3
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
-		await TestAsync();
+			Assert.AreEqual(BindingTestResult.Success, response.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, response.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, response.FilteringBehavior);
+			Assert.IsNotNull(response.PublicEndPoint);
+			Assert.IsNotNull(response.LocalEndPoint);
+			Assert.IsNotNull(response.OtherEndPoint);
+		}
 
-		async Task TestAsync()
+		[TestMethod]
+		public async Task BindingTestFailAsync()
 		{
+			var ip = IPAddress.Parse(@"1.1.1.1");
+			using var client = new StunClient5389UDP(new IPEndPoint(ip, Port), Any);
+
+			var response = await client.BindingTestAsync();
+
+			Assert.AreEqual(BindingTestResult.Fail, response.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, response.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, response.FilteringBehavior);
+			Assert.IsNull(response.PublicEndPoint);
+			Assert.IsNull(response.LocalEndPoint);
+			Assert.IsNull(response.OtherEndPoint);
+		}
+
+		[TestMethod]
+		public async Task MappingBehaviorTestFailAsync()
+		{
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
+
+			var fail = new StunResult5389 { BindingTestResult = BindingTestResult.Fail };
+
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(fail);
+
+			await client.MappingBehaviorTestAsync();
+
+			Assert.AreEqual(BindingTestResult.Fail, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
+			Assert.IsNull(client.State.PublicEndPoint);
+			Assert.IsNull(client.State.LocalEndPoint);
+			Assert.IsNull(client.State.OtherEndPoint);
+		}
+
+		[TestMethod]
+		public async Task MappingBehaviorTestUnsupportedServerAsync()
+		{
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
+
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			await TestAsync();
+
+			var r2 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress2
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+			await TestAsync();
+
+			var r3 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress3
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
+			await TestAsync();
+
+			async Task TestAsync()
+			{
+				await client.MappingBehaviorTestAsync();
+
+				Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+				Assert.AreEqual(MappingBehavior.UnsupportedServer, client.State.MappingBehavior);
+				Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
+				Assert.IsNotNull(client.State.PublicEndPoint);
+				Assert.IsNotNull(client.State.LocalEndPoint);
+			}
+		}
+
+		[TestMethod]
+		public async Task MappingBehaviorTestDirectAsync()
+		{
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
+
+			var response = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = MappedAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(response);
+
 			await client.MappingBehaviorTestAsync();
 
 			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-			Assert.AreEqual(MappingBehavior.UnsupportedServer, client.State.MappingBehavior);
+			Assert.AreEqual(MappingBehavior.Direct, client.State.MappingBehavior);
 			Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
 			Assert.IsNotNull(client.State.PublicEndPoint);
 			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
 		}
-	}
 
-	[TestMethod]
-	public async Task MappingBehaviorTestDirectAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 response = new()
+		[TestMethod]
+		public async Task MappingBehaviorTestEndpointIndependentAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = MappedAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(response);
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			await client.MappingBehaviorTestAsync();
 
-		await client.MappingBehaviorTestAsync();
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.EndpointIndependent, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Direct, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
-
-	[TestMethod]
-	public async Task MappingBehaviorTestEndpointIndependentAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task MappingBehaviorTest2FailAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		await client.MappingBehaviorTestAsync();
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.EndpointIndependent, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r2 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Fail,
+			};
 
-	[TestMethod]
-	public async Task MappingBehaviorTest2FailAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+			await client.MappingBehaviorTestAsync();
 
-		StunResult5389 r1 = new()
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Fail, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
+
+		[TestMethod]
+		public async Task MappingBehaviorTestAddressDependentAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResult5389 r2 = new()
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
+
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r2 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress2,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r3 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress2,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress1)), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
+
+			await client.MappingBehaviorTestAsync();
+
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.AddressDependent, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
+
+		[TestMethod]
+		public async Task MappingBehaviorTestAddressAndPortDependentAsync()
 		{
-			BindingTestResult = BindingTestResult.Fail,
-		};
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
-		await client.MappingBehaviorTestAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r2 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress2,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r3 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress1)), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Fail, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			await client.MappingBehaviorTestAsync();
 
-	[TestMethod]
-	public async Task MappingBehaviorTestAddressDependentAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.AddressAndPortDependent, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
 
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task MappingBehaviorTest3FailAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResult5389 r2 = new()
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
+
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r2 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress2,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r3 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Fail
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress1)), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
+
+			await client.MappingBehaviorTestAsync();
+
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Fail, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
+
+		[TestMethod]
+		public async Task FilteringBehaviorTestFailAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress2,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResult5389 r3 = new()
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
+
+			var fail = new StunResult5389 { BindingTestResult = BindingTestResult.Fail };
+
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(fail);
+
+			await client.FilteringBehaviorTestAsync();
+
+			Assert.AreEqual(BindingTestResult.Fail, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
+			Assert.IsNull(client.State.PublicEndPoint);
+			Assert.IsNull(client.State.LocalEndPoint);
+			Assert.IsNull(client.State.OtherEndPoint);
+		}
+
+		[TestMethod]
+		public async Task FilteringBehaviorTestUnsupportedServerAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress2,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress1)), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.MappingBehaviorTestAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			await TestAsync();
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.AddressDependent, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			var r2 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress2
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+			await TestAsync();
 
-	[TestMethod]
-	public async Task MappingBehaviorTestAddressAndPortDependentAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			var r3 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress3
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
+			await TestAsync();
 
-		StunResult5389 r1 = new()
+			async Task TestAsync()
+			{
+				await client.FilteringBehaviorTestAsync();
+
+				Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+				Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
+				Assert.AreEqual(FilteringBehavior.UnsupportedServer, client.State.FilteringBehavior);
+				Assert.IsNotNull(client.State.PublicEndPoint);
+				Assert.IsNotNull(client.State.LocalEndPoint);
+			}
+		}
+
+		[TestMethod]
+		public async Task FilteringBehaviorTestEndpointIndependentAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResult5389 r2 = new()
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
+
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r2 = new StunResponse(DefaultStunMessage, ChangedAddress1, LocalAddress1.Address);
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+
+			await client.FilteringBehaviorTestAsync();
+
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.EndpointIndependent, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
+
+		[TestMethod]
+		public async Task FilteringBehaviorTest2UnsupportedServerAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress2,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResult5389 r3 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress1)), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.MappingBehaviorTestAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r2 = new StunResponse(DefaultStunMessage, ServerAddress, LocalAddress1.Address);
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(r2);
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.AddressAndPortDependent, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
-
-	[TestMethod]
-	public async Task MappingBehaviorTest3FailAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 r1 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResult5389 r2 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress2,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResult5389 r3 = new()
-		{
-			BindingTestResult = BindingTestResult.Fail
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress1)), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
-
-		await client.MappingBehaviorTestAsync();
-
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Fail, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
-
-	[TestMethod]
-	public async Task FilteringBehaviorTestFailAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 fail = new() { BindingTestResult = BindingTestResult.Fail };
-
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(fail);
-
-		await client.FilteringBehaviorTestAsync();
-
-		Assert.AreEqual(BindingTestResult.Fail, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
-		Assert.IsNull(client.State.PublicEndPoint);
-		Assert.IsNull(client.State.LocalEndPoint);
-		Assert.IsNull(client.State.OtherEndPoint);
-	}
-
-	[TestMethod]
-	public async Task FilteringBehaviorTestUnsupportedServerAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 r1 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		await TestAsync();
-
-		StunResult5389 r2 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress2
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
-		await TestAsync();
-
-		StunResult5389 r3 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress3
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
-		await TestAsync();
-
-		async Task TestAsync()
-		{
 			await client.FilteringBehaviorTestAsync();
 
 			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
@@ -392,284 +448,231 @@ public class StunClien5389UDPTest
 			Assert.AreEqual(FilteringBehavior.UnsupportedServer, client.State.FilteringBehavior);
 			Assert.IsNotNull(client.State.PublicEndPoint);
 			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
 		}
-	}
 
-	[TestMethod]
-	public async Task FilteringBehaviorTestEndpointIndependentAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task FilteringBehaviorTestAddressAndPortDependentAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResponse r2 = new(DefaultStunMessage, ChangedAddress1, LocalAddress1.Address);
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.FilteringBehaviorTestAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
+			mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.EndpointIndependent, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			await client.FilteringBehaviorTestAsync();
 
-	[TestMethod]
-	public async Task FilteringBehaviorTest2UnsupportedServerAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.AddressAndPortDependent, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
 
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task FilteringBehaviorTestAddressDependentAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResponse r2 = new(DefaultStunMessage, ServerAddress, LocalAddress1.Address);
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.FilteringBehaviorTestAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r3 = new StunResponse(DefaultStunMessage, ChangedAddress2, LocalAddress1.Address);
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
+			mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(r3);
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.UnsupportedServer, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			await client.FilteringBehaviorTestAsync();
 
-	[TestMethod]
-	public async Task FilteringBehaviorTestAddressAndPortDependentAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.AddressDependent, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
 
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task FilteringBehaviorTest3UnsupportedServerAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
-		mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.FilteringBehaviorTestAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r3 = new StunResponse(DefaultStunMessage, ServerAddress, LocalAddress1.Address);
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
+			mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(r3);
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.AddressAndPortDependent, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			await client.FilteringBehaviorTestAsync();
 
-	[TestMethod]
-	public async Task FilteringBehaviorTestAddressDependentAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.UnsupportedServer, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
 
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task QueryFailTestAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResponse r3 = new(DefaultStunMessage, ChangedAddress2, LocalAddress1.Address);
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
-		mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(r3);
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.FilteringBehaviorTestAsync();
+			var fail = new StunResult5389 { BindingTestResult = BindingTestResult.Fail };
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.AddressDependent, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(fail);
 
-	[TestMethod]
-	public async Task FilteringBehaviorTest3UnsupportedServerAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			await client.QueryAsync();
 
-		StunResult5389 r1 = new()
+			Assert.AreEqual(BindingTestResult.Fail, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
+			Assert.IsNull(client.State.PublicEndPoint);
+			Assert.IsNull(client.State.LocalEndPoint);
+			Assert.IsNull(client.State.OtherEndPoint);
+		}
+
+		[TestMethod]
+		public async Task QueryUnsupportedServerTestAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResponse r3 = new(DefaultStunMessage, ServerAddress, LocalAddress1.Address);
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
-		mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(r3);
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.FilteringBehaviorTestAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ServerAddress
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.UnsupportedServer, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			await client.QueryAsync();
 
-	[TestMethod]
-	public async Task QueryFailTestAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.UnsupportedServer, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+		}
 
-		StunResult5389 fail = new() { BindingTestResult = BindingTestResult.Fail };
-
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(fail);
-
-		await client.QueryAsync();
-
-		Assert.AreEqual(BindingTestResult.Fail, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.Unknown, client.State.FilteringBehavior);
-		Assert.IsNull(client.State.PublicEndPoint);
-		Assert.IsNull(client.State.LocalEndPoint);
-		Assert.IsNull(client.State.OtherEndPoint);
-	}
-
-	[TestMethod]
-	public async Task QueryUnsupportedServerTestAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task QueryMappingBehaviorDirectTestAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ServerAddress
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.QueryAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = MappedAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
+			mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Unknown, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.UnsupportedServer, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-	}
+			await client.QueryAsync();
 
-	[TestMethod]
-	public async Task QueryMappingBehaviorDirectTestAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.Direct, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.AddressAndPortDependent, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
 
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task QueryMappingBehaviorEndpointIndependentTestAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = MappedAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
-		mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.QueryAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
+			mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.Direct, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.AddressAndPortDependent, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			await client.QueryAsync();
 
-	[TestMethod]
-	public async Task QueryMappingBehaviorEndpointIndependentTestAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.EndpointIndependent, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.AddressAndPortDependent, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
 
-		StunResult5389 r1 = new()
+		[TestMethod]
+		public async Task QueryMappingBehaviorAddressAndPortDependentTestAsync()
 		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.IsAny<IPEndPoint>(), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
-		mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
+			var mock = new Mock<StunClient5389UDP>(ServerAddress, Any, default);
+			var client = mock.Object;
 
-		await client.QueryAsync();
+			var r1 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r2 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress2,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			var r3 = new StunResult5389
+			{
+				BindingTestResult = BindingTestResult.Success,
+				PublicEndPoint = MappedAddress1,
+				LocalEndPoint = LocalAddress1,
+				OtherEndPoint = ChangedAddress1
+			};
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
+			mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress1)), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
+			mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
+			mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
 
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.EndpointIndependent, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.AddressAndPortDependent, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
-	}
+			await client.QueryAsync();
 
-	[TestMethod]
-	public async Task QueryMappingBehaviorAddressAndPortDependentTestAsync()
-	{
-		Mock<StunClient5389UDP> mock = new(ServerAddress, Any, default);
-		StunClient5389UDP? client = mock.Object;
-
-		StunResult5389 r1 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResult5389 r2 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress2,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		StunResult5389 r3 = new()
-		{
-			BindingTestResult = BindingTestResult.Success,
-			PublicEndPoint = MappedAddress1,
-			LocalEndPoint = LocalAddress1,
-			OtherEndPoint = ChangedAddress1
-		};
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ServerAddress)), It.IsAny<CancellationToken>())).ReturnsAsync(r1);
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress3)), It.IsAny<CancellationToken>())).ReturnsAsync(r2);
-		mock.Setup(x => x.BindingTestBaseAsync(It.Is<IPEndPoint>(p => Equals(p, ChangedAddress1)), It.IsAny<CancellationToken>())).ReturnsAsync(r3);
-		mock.Setup(x => x.FilteringBehaviorTest2Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
-		mock.Setup(x => x.FilteringBehaviorTest3Async(It.IsAny<CancellationToken>())).ReturnsAsync(default(StunResponse?));
-
-		await client.QueryAsync();
-
-		Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
-		Assert.AreEqual(MappingBehavior.AddressAndPortDependent, client.State.MappingBehavior);
-		Assert.AreEqual(FilteringBehavior.AddressAndPortDependent, client.State.FilteringBehavior);
-		Assert.IsNotNull(client.State.PublicEndPoint);
-		Assert.IsNotNull(client.State.LocalEndPoint);
-		Assert.IsNotNull(client.State.OtherEndPoint);
+			Assert.AreEqual(BindingTestResult.Success, client.State.BindingTestResult);
+			Assert.AreEqual(MappingBehavior.AddressAndPortDependent, client.State.MappingBehavior);
+			Assert.AreEqual(FilteringBehavior.AddressAndPortDependent, client.State.FilteringBehavior);
+			Assert.IsNotNull(client.State.PublicEndPoint);
+			Assert.IsNotNull(client.State.LocalEndPoint);
+			Assert.IsNotNull(client.State.OtherEndPoint);
+		}
 	}
 }
